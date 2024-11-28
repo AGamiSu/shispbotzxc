@@ -2,99 +2,121 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 var (
-	partyMessageID int
+	logChatID int64 = -1002496070860 // ID чата для логов
 )
 
 func main() {
-	bot, err := tgbotapi.NewBotAPI("7625350088:AAGY2qai8kYZ9cwbowBODmOtFlwjhoO8ubM")
+	// Создание бота
+	bot, err := tgbotapi.NewBotAPI("YOUR_BOT_TOKEN")
 	if err != nil {
-		log.Panic(err)
+		log.Fatalf("Ошибка создания бота: %v", err)
 	}
 
-	bot.Debug = true
+	log.Printf("Бот авторизован как %s", bot.Self.UserName)
 
+	// Обновления от Telegram
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message != nil && update.Message.IsCommand() {
-			switch update.Message.Command() {
-			case "пати":
-				handleParty(bot, update)
-			case "батлкап":
-				handleBattleCup(bot)
-			}
+		if update.Message != nil { // Если пришло сообщение
+			handleMessage(bot, update.Message)
+		}
+
+		if update.CallbackQuery != nil { // Обработка нажатий на кнопки
+			handleCallback(bot, update.CallbackQuery)
 		}
 	}
 }
 
-func handleParty(bot *tgbotapi.BotAPI, update tgbotapi.Update) {
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Собираем игроков! Нажмите кнопку, чтобы присоединиться.")
+// Обработка текстовых сообщений
+func handleMessage(bot *tgbotapi.BotAPI, msg *tgbotapi.Message) {
+	// Логируем входящее сообщение в лог-чат
+	sendLog(bot, "Получено сообщение: "+msg.Text+" от "+msg.From.UserName)
+
+	// Обработка команд
+	switch msg.Command() {
+	case "party":
+		handleParty(bot, msg.Chat.ID)
+	case "battlecup":
+		handleBattlecup(bot, msg.Chat.ID)
+	default:
+		bot.Send(tgbotapi.NewMessage(msg.Chat.ID, "Неизвестная команда"))
+	}
+}
+
+// Обработка команды /party
+func handleParty(bot *tgbotapi.BotAPI, chatID int64) {
 	buttons := [][]tgbotapi.InlineKeyboardButton{
-		{
-			tgbotapi.NewInlineKeyboardButtonData("Присоединиться", "join_party"),
-			tgbotapi.NewInlineKeyboardButtonData("Покинуть", "leave_party"),
-		},
+		{tgbotapi.NewInlineKeyboardButtonData("Вступить", "join_party")},
+		{tgbotapi.NewInlineKeyboardButtonData("Выйти", "leave_party")},
 	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	msg := tgbotapi.NewMessage(chatID, "Собираем пати! Нажмите, чтобы присоединиться:")
 	msg.ReplyMarkup = keyboard
 
-	// Удаление предыдущего сообщения
-	if partyMessageID != 0 {
-		deleteMsg := tgbotapi.NewDeleteMessage(update.Message.Chat.ID, partyMessageID)
-		bot.Send(deleteMsg)
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Ошибка отправки сообщения: %v", err)
 	}
-
-	sentMsg, _ := bot.Send(msg)
-	partyMessageID = sentMsg.MessageID // Сохраняем ID нового сообщения
 }
 
-
-func handleBattleCup(bot *tgbotapi.BotAPI) {
-	loc, _ := time.LoadLocation("Europe/Moscow")
-	now := time.Now().In(loc)
-	nextSaturday := now.AddDate(0, 0, (6-int(now.Weekday()))%7)
-	scheduleTime := time.Date(nextSaturday.Year(), nextSaturday.Month(), nextSaturday.Day(), 9, 0, 0, 0, loc)
-
-	// Таймер на утреннее сообщение
-	go func() {
-		time.Sleep(time.Until(scheduleTime.Add(-12 * time.Hour))) // 9 утра МСК
-		sendBattleCupMessage(bot)
-	}()
-
-	// Таймер на пинг за 30 минут
-	go func() {
-		time.Sleep(time.Until(scheduleTime.Add(-30 * time.Minute)))
-		sendReminder(bot)
-	}()
-}
-
-func sendBattleCupMessage(bot *tgbotapi.BotAPI) {
-	msg := tgbotapi.NewMessage(-1001740769275, "Выберите вашу роль для Батлкапа:")
+// Обработка команды /battlecup
+func handleBattlecup(bot *tgbotapi.BotAPI, chatID int64) {
 	buttons := [][]tgbotapi.InlineKeyboardButton{
-		{
-			tgbotapi.NewInlineKeyboardButtonData("Керри", "carry"),
-			tgbotapi.NewInlineKeyboardButtonData("Мидер", "mid"),
-		},
-		{
-			tgbotapi.NewInlineKeyboardButtonData("Офлейн", "offlane"),
-			tgbotapi.NewInlineKeyboardButtonData("Саппорт 4", "pos4"),
-			tgbotapi.NewInlineKeyboardButtonData("Саппорт 5", "pos5"),
-		},
+		{tgbotapi.NewInlineKeyboardButtonData("Керри", "role_carry")},
+		{tgbotapi.NewInlineKeyboardButtonData("Мидер", "role_mid")},
+		{tgbotapi.NewInlineKeyboardButtonData("Оффлейн", "role_offlane")},
+		{tgbotapi.NewInlineKeyboardButtonData("Саппорт 4", "role_pos4")},
+		{tgbotapi.NewInlineKeyboardButtonData("Саппорт 5", "role_pos5")},
 	}
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(buttons...)
-	bot.Send(msg)
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(buttons...)
+	msg := tgbotapi.NewMessage(chatID, "Собираем команду для BattleCup! Выберите роль:")
+	msg.ReplyMarkup = keyboard
+
+	if _, err := bot.Send(msg); err != nil {
+		log.Printf("Ошибка отправки сообщения: %v", err)
+	}
 }
 
-func sendReminder(bot *tgbotapi.BotAPI) {
-	msg := tgbotapi.NewMessage(-1001740769275, "Напоминание! Подтвердите участие в Батлкапе!")
+// Обработка callback кнопок
+func handleCallback(bot *tgbotapi.BotAPI, query *tgbotapi.CallbackQuery) {
+	var response string
+
+	switch query.Data {
+	case "join_party":
+		response = "Вы присоединились к пати!"
+	case "leave_party":
+		response = "Вы вышли из пати."
+	case "role_carry":
+		response = "Вы выбрали роль: Керри."
+	case "role_mid":
+		response = "Вы выбрали роль: Мидер."
+	case "role_offlane":
+		response = "Вы выбрали роль: Оффлейн."
+	case "role_pos4":
+		response = "Вы выбрали роль: Саппорт 4."
+	case "role_pos5":
+		response = "Вы выбрали роль: Саппорт 5."
+	}
+
+	// Ответ на нажатие кнопки
+	msg := tgbotapi.NewMessage(query.Message.Chat.ID, response)
+	bot.Send(msg)
+
+	// Логируем нажатие кнопки
+	sendLog(bot, "Нажата кнопка: "+query.Data+" от "+query.From.UserName)
+}
+
+// Отправка логов в лог-чат
+func sendLog(bot *tgbotapi.BotAPI, message string) {
+	msg := tgbotapi.NewMessage(logChatID, message)
 	bot.Send(msg)
 }

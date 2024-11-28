@@ -1,31 +1,38 @@
 package main
 
 import (
-    "fmt"
-    "log"
-    "net/http"
+	"log"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-const donationToken = "MDmUS0LsuloNvUHonPmxLKhsKVxPSGuPCDocEDK9"
-
 func main() {
-    url := "https://www.donationalerts.com/api/v1/alerts/donations"
-    req, err := http.NewRequest("GET", url, nil)
-    if err != nil {
-        log.Fatal(err)
-    }
-    req.Header.Set("Authorization", "Bearer "+donationToken)
+	// Ваш токен
+	bot, err := tgbotapi.NewBotAPI("7625350088:AAGY2qai8kYZ9cwbowBODmOtFlwjhoO8ubM")
+	if err != nil {
+		log.Fatalf("Ошибка подключения к боту: %v", err)
+	}
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer resp.Body.Close()
+	bot.Debug = true // Включить отладочный режим для детального вывода
 
-    if resp.StatusCode == http.StatusOK {
-        fmt.Println("Токен работает корректно!")
-    } else {
-        fmt.Printf("Ошибка: %s\n", resp.Status)
-    }
+	// Ваш User ID
+	yourTelegramID := int64(-1001740769275)
+
+	// Пробуем отправить тестовое сообщение с кнопками
+	msg := tgbotapi.NewMessage(yourTelegramID, "Это тестовое сообщение с кнопками.")
+	buttons := [][]tgbotapi.InlineKeyboardButton{
+		{
+			tgbotapi.NewInlineKeyboardButtonData("Кнопка 1", "data1"),
+			tgbotapi.NewInlineKeyboardButtonData("Кнопка 2", "data2"),
+		},
+	}
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(buttons...)
+
+	// Отправляем сообщение
+	_, err = bot.Send(msg)
+	if err != nil {
+		log.Fatalf("Не удалось отправить сообщение: %v", err)
+	}
+
+	log.Println("Сообщение отправлено успешно!")
 }
