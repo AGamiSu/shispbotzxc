@@ -214,7 +214,7 @@ func updateBattlecupMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	if _, err := bot.Send(editMsg); err != nil {
 		log.Printf("Ошибка обновления сообщения: %v", err)
 	}
-}
+
 
 	// Обновляем сообщение для join/leave
 	messageText := "Собираем пати! Текущие участники:\n" + formatPartyList(chatID)
@@ -224,6 +224,7 @@ func updateBattlecupMessage(bot *tgbotapi.BotAPI, chatID int64) {
 	if _, err := bot.Send(editMsg); err != nil {
 		log.Printf("Ошибка обновления сообщения: %v", err)
 	}
+}
 }
 
 // Удаление пользователя из пати
