@@ -1,0 +1,7 @@
+botToken = "7546019211:AAF5pJWX6vmusn-7u1Bp_NjMvAiYaKqmNQw"
+
+
+
+apiURL   = "https://api.openweathermap.org/data/2.5/weather?q=Moscow&appid=6f2d0398e8f36240d62f83eda6337f1a&units=metric"
+
+
